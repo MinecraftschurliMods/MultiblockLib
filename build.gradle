@@ -1,0 +1,168 @@
+subprojects {
+
+    apply plugin: 'maven-publish'
+    apply plugin: 'java'
+    apply plugin: 'eclipse'
+    apply plugin: 'idea'
+
+    java {
+        toolchain {
+            languageVersion = JavaLanguageVersion.of(java_version)
+            vendor = JvmVendorSpec.ADOPTOPENJDK
+        }
+        withSourcesJar()
+        withJavadocJar()
+    }
+
+    if (System.getenv('RELEASE_TYPE') != null) {
+        status = System.getenv('RELEASE_TYPE').toLowerCase()
+        if (status != 'release') {
+            if (status == 'snapshot') status = status.toUpperCase()
+            version = "${version}-${status}"
+        }
+    } else {
+        version = "${version}-SNAPSHOT"
+    }
+
+    archivesBaseName = "${mod_name}-${project.name.toLowerCase()}-${minecraft_version}"
+
+    jar {
+        from("LICENSE") {
+            rename { "${it}_${mod_name}" }
+        }
+        manifest {
+            mainAttributes([
+                    'Specification-Title'     : mod_name,
+                    'Specification-Vendor'    : author,
+                    'Specification-Version'   : project.jar.archiveVersion,
+                    'Implementation-Title'    : project.name,
+                    'Implementation-Version'  : project.jar.archiveVersion,
+                    'Implementation-Vendor'   : author,
+                    'Implementation-Timestamp': new Date().format("yyyy-MM-dd'T'HH:mm:ssZ"),
+                    'Timestampe'              : System.currentTimeMillis(),
+                    'Built-On-Java'           : "${System.getProperty('java.vm.version')} (${System.getProperty('java.vm.vendor')})",
+                    'Build-On-Minecraft'      : minecraft_version,
+                    'LICENSE'                 : 'MIT'
+            ])
+        }
+    }
+
+    repositories {
+        mavenLocal()
+        mavenCentral()
+
+        maven {
+            name = 'Sponge / Mixin'
+            url = 'https://repo.spongepowered.org/repository/maven-public/'
+        }
+
+        maven {
+            name = 'BlameJared Maven (CrT / Bookshelf)'
+            url = 'https://maven.blamejared.com'
+        }
+    }
+
+    if (project.name != 'Xplat') {
+        dependencies {
+            implementation project(':Xplat')
+        }
+        project(":Xplat").afterEvaluate { xplat ->
+            processResources {
+                from xplat.sourceSets.main.resources
+            }
+            tasks.withType(JavaCompile).configureEach {
+                source(xplat.sourceSets.main.allSource)
+            }
+        }
+    }
+
+    processResources {
+        def buildProps = project.properties.clone()
+
+        inputs.properties buildProps
+        filesMatching(['pack.mcmeta', 'fabric.mod.json', 'mods.toml']) {
+            expand buildProps
+        }
+    }
+
+    tasks.withType(JavaCompile).configureEach {
+        it.options.encoding = 'UTF-8'
+        it.options.release = java_version as int
+    }
+
+    // Disables Gradle's custom module metadata from being published to maven. The
+    // metadata includes mapped dependencies which are not reasonably consumable by
+    // other mod developers.
+    tasks.withType(GenerateModuleMetadata) {
+        enabled = false
+    }
+
+    publishing {
+        publications {
+            publications.create(project.name+'ToMaven', MavenPublication) {
+                groupId project.group
+                artifactId project.archivesBaseName
+                version project.version
+                artifact jar
+                pom {
+                    name = rootProject.name
+                    url = "https://github.com/${organisation}/${repository}"
+                    packaging = 'jar'
+                    scm {
+                        connection = "scm:git:git://github.com/${organisation}/${repository}.git"
+                        developerConnection = "scm:git:git@github.com:${organisation}/${repository}.git"
+                        url = "https://github.com/${organisation}/${repository}"
+                    }
+                    issueManagement {
+                        system = 'github'
+                        url = "https://github.com/${organisation}/${repository}.git/issues"
+                    }
+                    organization {
+                        name = "${organisation_name}"
+                        url = "https://github.com/${organisation}"
+                    }
+                    developers {
+                        developer {
+                            id = "${author.toLowerCase()}"
+                            name = "${author}"
+                            email = "${author_email}"
+                            organization = "${organisation_name}"
+                            organizationUrl = "https://github.com/${organisation}"
+                            timezone = "${timezone}"
+                        }
+                    }
+                    licenses {
+                        license {
+                            name = 'MIT'
+                            url = "https://github.com/${organisation}/${repository}/blob/${branch}/LICENSE"
+                            distribution = 'repo'
+                        }
+                    }
+                    withXml {
+                        asNode().dependencies.dependency.each { dep ->
+                            if(dep.version.last().value().last().contains('_mapped_')) {
+                                assert dep.parent().remove(dep)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        repositories {
+            maven {
+                if ((System.getenv("MAVEN_USER") != null) &&
+                        (System.getenv("MAVEN_PASSWORD") != null) &&
+                        (System.getenv("MAVEN_URL") != null)
+                ) {
+                    url System.getenv("MAVEN_URL")
+                    credentials {
+                        username System.getenv("MAVEN_USER")
+                        password System.getenv("MAVEN_PASSWORD")
+                    }
+                } else {
+                    url "$buildDir/repo"
+                }
+            }
+        }
+    }
+}
