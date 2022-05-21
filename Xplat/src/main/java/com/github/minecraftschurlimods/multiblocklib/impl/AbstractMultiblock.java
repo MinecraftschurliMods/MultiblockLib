@@ -2,7 +2,12 @@ package com.github.minecraftschurlimods.multiblocklib.impl;
 
 import com.github.minecraftschurlimods.multiblocklib.api.BlockStateMatchContext;
 import com.github.minecraftschurlimods.multiblocklib.api.Multiblock;
+import com.github.minecraftschurlimods.multiblocklib.api.StateMatcher;
+import com.github.minecraftschurlimods.multiblocklib.impl.matcher.AirMatcher;
+import com.github.minecraftschurlimods.multiblocklib.impl.matcher.AnyMatcher;
+import com.google.common.collect.ImmutableMap;
 import com.mojang.datafixers.util.Pair;
+import net.minecraft.Util;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Vec3i;
 import net.minecraft.world.level.BlockGetter;
@@ -10,6 +15,7 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Mirror;
 import net.minecraft.world.level.block.Rotation;
 import net.minecraft.world.level.block.state.BlockState;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -35,9 +41,9 @@ public abstract class AbstractMultiblock implements Multiblock {
 
     @Override
     public void place(final Level level, final BlockPos anchorPos, final Rotation rotation, final Mirror mirror) {
-        simulate(level, anchorPos, rotation, mirror).forEach(r -> {
+        simulate(anchorPos, rotation, mirror).forEach(r -> {
             BlockPos placePos = r.worldPos();
-            BlockState targetState = r.stateMatcher().displayState(level.getGameTime()).rotate(rotation);
+            BlockState targetState = r.stateMatcher().displayState(level.getGameTime()).rotate(rotation).mirror(mirror);
             if (!targetState.isAir() && targetState.canSurvive(level, placePos) && level.getBlockState(placePos).getMaterial().isReplaceable()) {
                 level.setBlockAndUpdate(placePos, targetState);
             }
@@ -46,9 +52,10 @@ public abstract class AbstractMultiblock implements Multiblock {
 
     @Override
     public boolean matches(final BlockGetter level, final BlockPos anchorPos, final Rotation rotation, final Mirror mirror) {
-        return simulate(level, anchorPos, rotation, mirror).stream().allMatch(simulateResult -> simulateResult.stateMatcher().test(new DenseMultiblock.SimpleBlockStateMatchContext(simulateResult.worldPos(), level, rotation, mirror)));
+        return simulate(anchorPos, rotation, mirror).stream().allMatch(simulateResult -> simulateResult.stateMatcher().test(new DenseMultiblock.SimpleBlockStateMatchContext(simulateResult.worldPos(), level, rotation, mirror)));
     }
 
+    @Nullable
     @Override
     public Pair<Rotation, Mirror> matches(final BlockGetter level, final BlockPos anchorPos) {
         if (isSymmetrical() && matches(level, anchorPos, Rotation.NONE, Mirror.NONE)) {
@@ -65,6 +72,40 @@ public abstract class AbstractMultiblock implements Multiblock {
         return null;
     }
 
+    private static final Map<Character, StateMatcher> DEFAULT_MATCHERS = Util.make(new HashMap<>(), map -> {
+        map.put('_', new AnyMatcher());
+        map.put(' ', new AirMatcher());
+        map.put('0', new AirMatcher());
+    });
+
+    protected static Map<Character, StateMatcher> addDefaultMappings(final Map<Character, StateMatcher> mapping) {
+        var builder = ImmutableMap.<Character, StateMatcher>builder();
+        builder.putAll(mapping);
+        for (final Map.Entry<Character, StateMatcher> entry : DEFAULT_MATCHERS.entrySet()) {
+            if (!mapping.containsKey(entry.getKey())) {
+                builder.put(entry.getKey(), entry.getValue());
+            }
+        }
+        return builder.build();
+    }
+
+    protected static Map<Character, StateMatcher> removeDefaultMappings(final Map<Character, StateMatcher> mapping) {
+        Map<Character, StateMatcher> out = new HashMap<>(mapping);
+        for (final Map.Entry<Character, StateMatcher> entry : DEFAULT_MATCHERS.entrySet()) {
+            if (mapping.containsKey(entry.getKey()) && mapping.get(entry.getKey()) == entry.getValue()) {
+                out.remove(entry.getKey());
+            }
+        }
+        return out;
+    }
+
+    protected record SimulateResultImpl(StateMatcher stateMatcher, BlockPos worldPos) implements SimulateResult {
+        @Override
+        public boolean test(final BlockGetter blockGetter, final Rotation rotation, final Mirror mirror) {
+            return stateMatcher().test(new SimpleBlockStateMatchContext(worldPos(), blockGetter, rotation, mirror));
+        }
+    }
+
     static class SimpleBlockStateMatchContext implements BlockStateMatchContext {
         private final BlockPos pos;
         private final BlockGetter level;
@@ -78,13 +119,13 @@ public abstract class AbstractMultiblock implements Multiblock {
                 case LEFT_RIGHT -> Mirror.NONE;
                 case FRONT_BACK -> Mirror.FRONT_BACK;
                 case NONE -> Mirror.LEFT_RIGHT;
-            };
+            };*/
             rotation = switch (rotation) {
                 case NONE -> Rotation.NONE;
                 case CLOCKWISE_90 -> Rotation.COUNTERCLOCKWISE_90;
                 case CLOCKWISE_180 -> Rotation.CLOCKWISE_180;
                 case COUNTERCLOCKWISE_90 -> Rotation.CLOCKWISE_90;
-            };*/
+            };
             this.state = level.getBlockState(pos).mirror(mirror).rotate(rotation);
         }
 

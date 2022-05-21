@@ -1,0 +1,28 @@
+{
+  "pattern": [
+    [" WWW "],
+    ["N   S"],
+    ["N 0 S"],
+    ["N   S"],
+    [" EEE "]
+  ],
+  "mapping": {
+    "N": {
+      "state": "minecraft:oak_stairs[facing=north]",
+      "type": "multiblocklib:strict_state"
+    },
+    "S": {
+      "state": "minecraft:birch_stairs[facing=south]",
+      "type": "multiblocklib:strict_state"
+    },
+    "W": {
+      "state": "minecraft:brick_stairs[facing=west]",
+      "type": "multiblocklib:strict_state"
+    },
+    "E": {
+      "state": "minecraft:stone_brick_stairs[facing=east]",
+      "type": "multiblocklib:strict_state"
+    }
+  },
+  "type": "multiblocklib:dense"
+}

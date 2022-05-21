@@ -3,6 +3,7 @@ package com.github.minecraftschurlimods.multiblocklib.impl;
 import com.github.minecraftschurlimods.multiblocklib.api.MBAPI;
 import com.github.minecraftschurlimods.multiblocklib.api.Multiblock;
 import com.github.minecraftschurlimods.multiblocklib.api.StateMatcher;
+import com.github.minecraftschurlimods.multiblocklib.impl.matcher.BasicMatcher;
 import com.github.minecraftschurlimods.multiblocklib.xplat.XplatAbstractions;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonElement;
@@ -22,6 +23,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 
 public class MBAPIImpl implements MBAPI {
     private static final Logger LOGGER = LoggerFactory.getLogger(MBAPI.class);
@@ -54,11 +56,11 @@ public class MBAPIImpl implements MBAPI {
 
     @Override
     public Codec<? extends StateMatcher> getStateMatcherCodec(final ResourceLocation resourceLocation) {
-        return STATE_MATCHER_TYPE_REGISTRY.get(resourceLocation);
+        return Objects.requireNonNullElse(STATE_MATCHER_TYPE_REGISTRY.get(resourceLocation), BasicMatcher.STRICT_STATE);
     }
 
     @Override
     public Codec<? extends Multiblock> getMultiblockCodec(final ResourceLocation resourceLocation) {
-        return MULTIBLOCK_TYPE_REGISTRY.get(resourceLocation);
+        return Objects.requireNonNullElse(MULTIBLOCK_TYPE_REGISTRY.get(resourceLocation), DenseMultiblock.CODEC);
     }
 }

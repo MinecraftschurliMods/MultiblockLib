@@ -28,6 +28,7 @@ minecraft {
             mods {
                 modClientRun {
                     source sourceSets.main
+                    source sourceSets.test
                     source project(":Xplat").sourceSets.main
                 }
             }
@@ -88,9 +89,17 @@ dependencies {
     implementation project(":Xplat").sourceSets.api.output
 }
 
+tasks.withType(JavaCompile) {
+    source(project(":Xplat").sourceSets.api.allSource)
+    source(project(":Xplat").sourceSets.main.allSource)
+}
+
+processResources {
+    from project(":Xplat").sourceSets.main.resources
+}
 
 jar.finalizedBy('reobfJar')
 
 jar.manifest {
-    attributes(['FMLModType': 'GAMELIBRARY'])
+    attributes(['FMLModType': 'MOD'])
 }

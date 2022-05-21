@@ -1,0 +1,34 @@
+{
+  "pattern": [
+    [" E ","   "],
+    ["S0N"," L "],
+    [" W ","   "]
+  ],
+  "mapping": {
+    "L": {
+      "block": "minecraft:lectern",
+      "type": "multiblocklib:strict_block"
+    },
+    "N": {
+      "state": "minecraft:sandstone_stairs[facing=north]",
+      "type": "multiblocklib:strict_state"
+    },
+    "S": {
+      "state": "minecraft:red_sandstone_stairs[facing=south]",
+      "type": "multiblocklib:strict_state"
+    },
+    "W": {
+      "state": "minecraft:prismarine_stairs[facing=west]",
+      "type": "multiblocklib:strict_state"
+    },
+    "E": {
+      "state": "minecraft:purpur_stairs[facing=east]",
+      "type": "multiblocklib:strict_state"
+    },
+    "0": {
+      "block": "minecraft:sandstone",
+      "type": "multiblocklib:loose_block"
+    }
+  },
+  "type": "multiblocklib:dense"
+}

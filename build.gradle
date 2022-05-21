@@ -62,6 +62,10 @@ subprojects {
         }
     }
 
+    dependencies {
+        implementation 'org.jetbrains:annotations:23.0.0'
+    }
+
     if (project.name != 'Xplat') {
         dependencies {
             implementation project(':Xplat')
@@ -76,11 +80,13 @@ subprojects {
         }
     }
 
-    processResources {
-        def buildProps = project.properties.clone()
+    project.ext.issue_tracker_url = "https://github.com/${organisation}/${repository}/issues"
 
+    processResources {
+        Map<String, ?> buildProps = project.properties.clone()
+        buildProps.values().removeIf { !it.getClass().isPrimitive() && !(it instanceof CharSequence) }
         inputs.properties buildProps
-        filesMatching(['pack.mcmeta', 'fabric.mod.json', 'mods.toml']) {
+        filesMatching(['pack.mcmeta', 'fabric.mod.json', 'META-INF/mods.toml']) {
             expand buildProps
         }
     }

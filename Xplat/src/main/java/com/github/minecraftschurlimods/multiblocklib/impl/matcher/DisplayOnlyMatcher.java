@@ -1,5 +1,6 @@
 package com.github.minecraftschurlimods.multiblocklib.impl.matcher;
 
+import com.github.minecraftschurlimods.multiblocklib.Util;
 import com.github.minecraftschurlimods.multiblocklib.api.BlockStateMatchContext;
 import com.github.minecraftschurlimods.multiblocklib.api.StateMatcher;
 import com.github.minecraftschurlimods.multiblocklib.init.Init;
@@ -10,7 +11,7 @@ import net.minecraft.world.level.block.state.BlockState;
 
 public class DisplayOnlyMatcher implements StateMatcher {
     public static final Codec<DisplayOnlyMatcher> CODEC = RecordCodecBuilder.create(inst -> inst.group(
-            BlockState.CODEC.fieldOf("display").forGetter(displayOnlyMatcher -> displayOnlyMatcher.displayState)
+            Util.BLOCK_STATE_CODEC.fieldOf("display").forGetter(displayOnlyMatcher -> displayOnlyMatcher.displayState)
     ).apply(inst, DisplayOnlyMatcher::new));
 
     private final BlockState displayState;

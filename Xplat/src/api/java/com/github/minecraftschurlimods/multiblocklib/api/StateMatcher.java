@@ -5,7 +5,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.block.state.BlockState;
 
 public interface StateMatcher {
-    Codec<StateMatcher> CODEC = ResourceLocation.CODEC.dispatch("type", StateMatcher::getType, MBAPI.INSTANCE::getStateMatcherCodec);
+    Codec<StateMatcher> CODEC = ResourceLocation.CODEC.dispatch(StateMatcher::getType, MBAPI.INSTANCE::getStateMatcherCodec);
 
     ResourceLocation getType();
 

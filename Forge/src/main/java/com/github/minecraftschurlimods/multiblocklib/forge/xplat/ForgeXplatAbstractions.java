@@ -1,5 +1,7 @@
 package com.github.minecraftschurlimods.multiblocklib.forge.xplat;
 
+import com.github.minecraftschurlimods.multiblocklib.impl.MBAPIImpl;
+import com.github.minecraftschurlimods.multiblocklib.init.Init;
 import com.github.minecraftschurlimods.multiblocklib.xplat.XplatAbstractions;
 import net.minecraft.server.packs.resources.PreparableReloadListener;
 import net.minecraftforge.common.MinecraftForge;
@@ -17,9 +19,9 @@ public class ForgeXplatAbstractions implements XplatAbstractions {
         serverReloadListeners.add(consumer);
     }
 
-    @Override
     public void init() {
-        XplatAbstractions.super.init();
+        MBAPIImpl.init();
+        Init.register();
         MinecraftForge.EVENT_BUS.addListener((AddReloadListenerEvent evt) -> serverReloadListeners.forEach(listener -> listener.accept(evt::addListener)));
     }
 }
