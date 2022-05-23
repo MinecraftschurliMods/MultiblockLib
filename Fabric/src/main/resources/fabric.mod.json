@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "id": "${mod_id}",
+  "version": "${version}",
+  "name": "${mod_name}",
+  "description": "",
+  "authors": [
+    "${author}"
+  ],
+  "contact": {
+    "sources": "${sources_url}",
+    "issues": "${issue_tracker_url}"
+  },
+  "license": "MIT",
+  "icon": "icon.png",
+  "environment": "*",
+  "entrypoints": {
+    "main": [
+      "com.github.miecraftschurlimods.multiblocklib.fabric.FabricModInitializer"
+    ]
+  },
+  "mixins": [
+    "${mod_id}_xplat.mixins.json",
+    "${mod_id}_fabric.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": ">=0.13",
+    "fabric": ">=0.47",
+    "minecraft": ">=1.18.2"
+  }
+}

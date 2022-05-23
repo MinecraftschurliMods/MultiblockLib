@@ -62,10 +62,10 @@ public interface RegistrationProvider<T> {
          * Creates a new {@link RegistrationProvider} for the {@link Registry} with the given {@link ResourceKey key}.
          *
          * @param registryKey the {@link ResourceKey} of the {@link Registry}
-         * @param mod_id      the mod id of the mod
+         * @param modId       the mod id of the mod
          * @return a new {@link RegistrationProvider} for the type T
          * @param <T>         the type of the {@link Registry}
          */
-        <T> RegistrationProvider<T> create(ResourceKey<? extends Registry<T>> registryKey, String mod_id);
+        <T> RegistrationProvider<T> create(ResourceKey<? extends Registry<T>> registryKey, String modId);
     }
 }

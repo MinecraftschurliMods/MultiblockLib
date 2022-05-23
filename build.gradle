@@ -81,6 +81,7 @@ subprojects {
     }
 
     project.ext.issue_tracker_url = "https://github.com/${organisation}/${repository}/issues"
+    project.ext.sources_url = "https://github.com/${organisation}/${repository}"
 
     processResources {
         Map<String, ?> buildProps = project.properties.clone()
@@ -88,6 +89,11 @@ subprojects {
         inputs.properties buildProps
         filesMatching(['pack.mcmeta', 'fabric.mod.json', 'META-INF/mods.toml']) {
             expand buildProps
+        }
+        filesMatching("*.mixins.json") {
+            // In Fabric, all refmaps are merged together and the refmap name is pre-set by Loom
+            // Make sure everyone uses that name
+            expand "refmap_target": archivesBaseName + "-"
         }
     }
 
