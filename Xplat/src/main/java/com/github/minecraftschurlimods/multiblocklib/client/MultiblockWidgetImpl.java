@@ -7,15 +7,24 @@ import com.github.minecraftschurlimods.multiblocklib.api.client.MultiblockWidget
 import com.github.minecraftschurlimods.multiblocklib.xplat.ClientXplatAbstractions;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.math.Matrix4f;
-import com.mojang.math.Vector3f;
-import com.mojang.math.Vector4f;
+import com.mojang.math.Quaternion;
+import net.minecraft.Util;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.components.AbstractWidget;
+import net.minecraft.client.gui.narration.NarratedElementType;
+import net.minecraft.client.gui.narration.NarrationElementOutput;
 import net.minecraft.client.renderer.MultiBufferSource;
-import net.minecraft.core.*;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.core.Registry;
+import net.minecraft.core.RegistryAccess;
+import net.minecraft.core.Vec3i;
+import net.minecraft.network.chat.TextComponent;
+import net.minecraft.network.chat.TranslatableComponent;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.BlockAndTintGetter;
 import net.minecraft.world.level.ColorResolver;
+import net.minecraft.world.level.LightLayer;
 import net.minecraft.world.level.biome.Biomes;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.EntityBlock;
@@ -34,28 +43,27 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
 
-public class MultiblockWidgetImpl implements MultiblockWidget {
+public class MultiblockWidgetImpl extends AbstractWidget implements MultiblockWidget {
     private static final Random RAND = new Random();
     private Multiblock multiblock;
-    private Rotation rotation;
     private Mirror mirror;
     private Collection<Multiblock.SimulateResult> simulateCache;
     private boolean dirty = true;
-    private float guiRotation;
+    private Quaternion rotation = Quaternion.ONE;
     private FakeMBLevel level;
-    private float width;
-    private float height;
+
+    public MultiblockWidgetImpl(int x, int y, int width, int height) {
+        super(x, y, width, height, TextComponent.EMPTY);
+    }
 
     @Override
-    public void render(final PoseStack stack, final int mouseX, final int mouseY, final float partialTicks) {
+    public void renderButton(final PoseStack stack, final int mouseX, final int mouseY, final float partialTicks) {
+        if (multiblock == null) return;
         if (dirty) {
-            if (rotation == null || multiblock.isSymmetrical()) {
-                rotation = Rotation.NONE;
-            }
             if (mirror == null || multiblock.isSymmetrical()) {
                 mirror = Mirror.NONE;
             }
-            simulateCache = multiblock.simulate(BlockPos.ZERO, rotation, mirror);
+            simulateCache = multiblock.simulate(BlockPos.ZERO, Rotation.NONE, mirror);
             level = new FakeMBLevel(multiblock.size(), simulateCache);
             dirty = false;
         }
@@ -70,29 +78,19 @@ public class MultiblockWidgetImpl implements MultiblockWidget {
         float scaleY = maxY / sizeY;
         float scale = -Math.min(scaleX, scaleY);
 
-        int xPos = 0;
-        int yPos = 0;
         stack.pushPose();
-        stack.translate(xPos, yPos, 100);
+        stack.translate(x, y, 100);
+        stack.translate(width/2., height/2., 0);
         stack.scale(scale, scale, scale);
-        stack.translate(-(float) sizeX / 2, -(float) sizeY / 2, 0);
-        Vector4f eye = new Vector4f(0, 0, -100, 1);
-        Matrix4f rotMat = new Matrix4f();
-        rotMat.setIdentity();
-        stack.mulPose(Vector3f.XP.rotationDegrees(-30F));
-        rotMat.multiply(Vector3f.XP.rotationDegrees(30));
-        float offX = (float) -sizeX / 2;
-        float offZ = (float) -sizeZ / 2 + 1;
-        stack.translate(-offX, 0, -offZ);
-        stack.mulPose(Vector3f.YP.rotationDegrees(guiRotation));
-        rotMat.multiply(Vector3f.YP.rotationDegrees(-guiRotation));
-        stack.mulPose(Vector3f.YP.rotationDegrees(45));
-        rotMat.multiply(Vector3f.YP.rotationDegrees(-45));
-        stack.translate(offX, 0, offZ);
-        eye.transform(rotMat);
-        eye.perspectiveDivide();
+        stack.mulPose(rotation);
+        stack.translate(-0.5, -0.5, 0.5);
         renderElements(stack);
         stack.popPose();
+    }
+
+    @Override
+    public void updateNarration(final NarrationElementOutput var1) {
+        var1.add(NarratedElementType.TITLE, new TranslatableComponent("gui.narrate.multiblock", getMessage()));
     }
 
     private void renderElements(PoseStack ms) {
@@ -120,34 +118,34 @@ public class MultiblockWidgetImpl implements MultiblockWidget {
     }
 
     @Override
-    public void setWidth(final float width) {
+    public void setWidth(final int width) {
         this.width = width;
     }
 
     @Override
-    public void setHeight(final float height) {
+    public void setHeight(final int height) {
         this.height = height;
     }
 
     @Override
-    public void setGuiRotation(float rotation) {
-        this.guiRotation = rotation;
+    public void setRotation(Quaternion rotation) {
+        this.rotation = rotation;
     }
 
     @Override
-    public void setMultiblock(ResourceLocation id) {
-        setMultiblock(MBAPI.INSTANCE.getMultiblock(id));
+    public boolean setMultiblock(ResourceLocation id) {
+        Multiblock multiblock = MBAPI.INSTANCE.getMultiblock(id);
+        if (multiblock != null) {
+            setMultiblock(multiblock);
+            return true;
+        }
+        return false;
     }
 
     @Override
     public void setMultiblock(Multiblock multiblock) {
         this.multiblock = multiblock;
-        this.dirty = true;
-    }
-
-    @Override
-    public void setRotation(final Rotation rotation) {
-        this.rotation = rotation;
+        setMessage(new TranslatableComponent(Util.makeDescriptionId("multiblock", MBAPI.INSTANCE.getMultiblockId(multiblock))));
         this.dirty = true;
     }
 
@@ -155,6 +153,11 @@ public class MultiblockWidgetImpl implements MultiblockWidget {
     public void setMirror(final Mirror mirror) {
         this.mirror = mirror;
         this.dirty = true;
+    }
+
+    @Override
+    public boolean mouseClicked(final double $$0, final double $$1, final int $$2) {
+        return false;
     }
 
     private static class FakeMBLevel implements BlockAndTintGetter {
@@ -175,12 +178,22 @@ public class MultiblockWidgetImpl implements MultiblockWidget {
 
         @Override
         public float getShade(final Direction var1, final boolean var2) {
-            return 0;
+            return 1.0F;
         }
 
         @Override
         public LevelLightEngine getLightEngine() {
             return null;
+        }
+
+        @Override
+        public int getBrightness(LightLayer type, BlockPos pos) {
+            return 15;
+        }
+
+        @Override
+        public int getRawBrightness(BlockPos pos, int ambientDarkening) {
+            return 15 - ambientDarkening;
         }
 
         @Override

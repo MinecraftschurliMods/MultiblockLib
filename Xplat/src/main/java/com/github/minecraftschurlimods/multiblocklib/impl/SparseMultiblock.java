@@ -10,7 +10,6 @@ import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Vec3i;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.block.Mirror;
 import net.minecraft.world.level.block.Rotation;
 
@@ -79,7 +78,18 @@ public class SparseMultiblock extends AbstractMultiblock {
     public Collection<SimulateResult> simulate(final BlockPos anchorPos, final Rotation rotation, final Mirror mirror) {
         return data.entrySet()
                 .stream()
-                .<SimulateResult>map(entry -> new SimulateResultImpl(entry.getValue(), anchorPos.offset(entry.getKey().rotate(rotation))))
+                .<SimulateResult>map(entry -> new SimulateResultImpl(entry.getValue(), anchorPos.offset(entry.getKey().rotate(rotation)), rotation, mirror))
                 .toList();
+    }
+
+    @Override
+    public boolean equals(final AbstractMultiblock o) {
+        final SparseMultiblock that = (SparseMultiblock) o;
+        return data.equals(that.data);
+    }
+
+    @Override
+    public int hashCode() {
+        return data.hashCode();
     }
 }

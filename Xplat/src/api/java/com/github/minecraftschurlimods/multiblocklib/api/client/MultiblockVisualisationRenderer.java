@@ -7,20 +7,30 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.block.Mirror;
 import net.minecraft.world.level.block.Rotation;
 
-/**
- * @author georg
- * @version 2022-05-21
- */
+import java.util.ServiceLoader;
+
 public interface MultiblockVisualisationRenderer {
+    MultiblockVisualisationRenderer INSTANCE = ServiceLoader.load(MultiblockVisualisationRenderer.class).findFirst().orElseThrow();
+
     void setMultiblock(ResourceLocation id);
 
     void setMultiblock(Multiblock multiblock);
 
+    Multiblock getMultiblock();
+
     void setAnchorPos(BlockPos anchorPos);
+
+    BlockPos getAnchorPos();
+
+    BlockPos getCurrentPos();
 
     void setRotation(Rotation rotation);
 
+    Rotation getRotation();
+
     void setMirror(Mirror mirror);
+
+    Mirror getMirror();
 
     void setEnabled();
 
@@ -35,6 +45,4 @@ public interface MultiblockVisualisationRenderer {
     int getBlocksDone();
 
     int getAirFilled();
-
-    void renderMultiblock(PoseStack stack);
 }

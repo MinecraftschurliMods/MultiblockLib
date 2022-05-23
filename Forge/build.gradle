@@ -3,9 +3,16 @@ plugins {
     id 'net.minecraftforge.gradle'
     id 'eclipse'
     id 'idea'
+    id 'org.spongepowered.mixin'
 }
 
 evaluationDependsOn(':Xplat')
+
+mixin {
+    add sourceSets.main, "${mod_id}.refmap.json"
+
+    config "${mod_id}_xplat.mixins.json"
+}
 
 minecraft {
     mappings channel: 'official', version: minecraft_version

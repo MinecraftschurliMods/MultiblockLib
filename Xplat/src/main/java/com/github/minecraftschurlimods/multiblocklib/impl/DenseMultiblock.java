@@ -10,7 +10,6 @@ import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Vec3i;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.block.Mirror;
 import net.minecraft.world.level.block.Rotation;
 
@@ -95,10 +94,27 @@ public class DenseMultiblock extends AbstractMultiblock {
             for (int y = 0; y < this.structure[0].length; y++) {
                 for (int z = 0; z < this.structure[0][0].length; z++) {
                     BlockPos pos = anchorPos.offset(new BlockPos(x, y, z).subtract(this.origin).rotate(rotation));
-                    results.add(new SimulateResultImpl(this.mapping.get(this.structure[x][y][z]), pos));
+                    results.add(new SimulateResultImpl(this.mapping.get(this.structure[x][y][z]), pos, rotation, mirror));
                 }
             }
         }
         return Collections.unmodifiableCollection(results);
+    }
+
+    @Override
+    public boolean equals(final AbstractMultiblock o) {
+        final DenseMultiblock that = (DenseMultiblock) o;
+
+        if (!Arrays.deepEquals(structure, that.structure)) {
+            return false;
+        }
+        return mapping.equals(that.mapping);
+    }
+
+    @Override
+    public int hashCode() {
+        int result = Arrays.deepHashCode(structure);
+        result = 31 * result + mapping.hashCode();
+        return result;
     }
 }

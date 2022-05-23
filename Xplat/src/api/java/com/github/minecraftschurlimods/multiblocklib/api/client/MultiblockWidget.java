@@ -1,17 +1,54 @@
 package com.github.minecraftschurlimods.multiblocklib.api.client;
 
 import com.github.minecraftschurlimods.multiblocklib.api.Multiblock;
+import com.mojang.math.Quaternion;
 import net.minecraft.client.gui.components.Widget;
+import net.minecraft.client.gui.components.events.GuiEventListener;
+import net.minecraft.client.gui.narration.NarratableEntry;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.block.Mirror;
-import net.minecraft.world.level.block.Rotation;
 
-public interface MultiblockWidget extends Widget {
-    void setMultiblock(ResourceLocation id);
+public interface MultiblockWidget extends Widget, GuiEventListener, NarratableEntry {
+    /**
+     * Set the multiblock for this widget.
+     *
+     * @param id the id of the multiblock to set
+     * @return true if the multiblock with that id exists, false otherwise
+     */
+    boolean setMultiblock(ResourceLocation id);
+
+    /**
+     * Set the multiblock for this widget.
+     *
+     * @param multiblock the multiblock to set
+     */
     void setMultiblock(Multiblock multiblock);
-    void setRotation(Rotation rotation);
+
+    /**
+     * Set the mirror mode for this multiblock widget.
+     *
+     * @param mirror the mirror mode to set
+     */
     void setMirror(Mirror mirror);
-    void setGuiRotation(float rotation);
-    void setWidth(float width);
-    void setHeight(float height);
+
+    /**
+     * Set the angle of rotation for this multiblock widget.
+     *
+     * @param rotation the rotation quaternion for the multiblock widget
+     */
+    void setRotation(Quaternion rotation);
+
+    /**
+     * Set the width of this multiblock widget.
+     *
+     * @param width the new width of this multiblock widget
+     */
+    void setWidth(int width);
+
+    /**
+     * Set the height of this multiblock widget.
+     *
+     * @param height the new height of this multiblock widget
+     */
+    void setHeight(int height);
 }

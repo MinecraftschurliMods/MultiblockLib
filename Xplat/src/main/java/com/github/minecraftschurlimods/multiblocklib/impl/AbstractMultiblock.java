@@ -43,7 +43,7 @@ public abstract class AbstractMultiblock implements Multiblock {
     public void place(final Level level, final BlockPos anchorPos, final Rotation rotation, final Mirror mirror) {
         simulate(anchorPos, rotation, mirror).forEach(r -> {
             BlockPos placePos = r.worldPos();
-            BlockState targetState = r.stateMatcher().displayState(level.getGameTime()).rotate(rotation).mirror(mirror);
+            BlockState targetState = r.displayState(level.getGameTime());
             if (!targetState.isAir() && targetState.canSurvive(level, placePos) && level.getBlockState(placePos).getMaterial().isReplaceable()) {
                 level.setBlockAndUpdate(placePos, targetState);
             }
@@ -99,10 +99,39 @@ public abstract class AbstractMultiblock implements Multiblock {
         return out;
     }
 
-    protected record SimulateResultImpl(StateMatcher stateMatcher, BlockPos worldPos) implements SimulateResult {
+    @Override
+    public boolean equals(final Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+
+        final AbstractMultiblock that = (AbstractMultiblock) o;
+
+        if (isSymmetrical() != that.isSymmetrical()) {
+            return false;
+        }
+        if (!size.equals(that.size)) {
+            return false;
+        }
+        return this.equals(that);
+    }
+
+    public abstract boolean equals(final AbstractMultiblock other);
+
+    public abstract int hashCode();
+
+    protected record SimulateResultImpl(StateMatcher stateMatcher, BlockPos worldPos, Rotation rotation, Mirror mirror) implements SimulateResult {
         @Override
-        public boolean test(final BlockGetter blockGetter, final Rotation rotation, final Mirror mirror) {
-            return stateMatcher().test(new SimpleBlockStateMatchContext(worldPos(), blockGetter, rotation, mirror));
+        public BlockState displayState(final long gameTime) {
+            return stateMatcher().displayState(gameTime).rotate(rotation()).mirror(mirror());
+        }
+
+        @Override
+        public boolean test(final BlockGetter blockGetter) {
+            return stateMatcher().test(new SimpleBlockStateMatchContext(worldPos(), blockGetter, rotation(), mirror()));
         }
     }
 

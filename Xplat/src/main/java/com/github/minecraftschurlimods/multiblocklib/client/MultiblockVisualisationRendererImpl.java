@@ -23,15 +23,16 @@ import net.minecraft.world.level.block.Mirror;
 import net.minecraft.world.level.block.Rotation;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.BlockHitResult;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.Collection;
 import java.util.IdentityHashMap;
 import java.util.Map;
+import java.util.Objects;
 
 public final class MultiblockVisualisationRendererImpl implements MultiblockVisualisationRenderer {
-    public static final MultiblockVisualisationRenderer INSTANCE = new MultiblockVisualisationRendererImpl();
-
     private Multiblock multiblock;
+    private BlockPos currentPos;
     private BlockPos anchorPos;
     private Rotation rotation;
     private Mirror mirror;
@@ -41,7 +42,7 @@ public final class MultiblockVisualisationRendererImpl implements MultiblockVisu
     private boolean dirty = true;
     private MultiBufferSource.BufferSource buffers = null;
 
-    private MultiblockVisualisationRendererImpl() {}
+    public MultiblockVisualisationRendererImpl() {}
 
     @Override
     public void setMultiblock(ResourceLocation id) {
@@ -49,9 +50,14 @@ public final class MultiblockVisualisationRendererImpl implements MultiblockVisu
     }
 
     @Override
-    public void setMultiblock(Multiblock multiblock) {
+    public void setMultiblock(@Nullable Multiblock multiblock) {
         this.multiblock = multiblock;
         this.dirty = true;
+    }
+
+    @Override
+    public Multiblock getMultiblock() {
+        return multiblock;
     }
 
     @Override
@@ -61,15 +67,35 @@ public final class MultiblockVisualisationRendererImpl implements MultiblockVisu
     }
 
     @Override
+    public BlockPos getAnchorPos() {
+        return anchorPos;
+    }
+
+    @Override
+    public BlockPos getCurrentPos() {
+        return currentPos;
+    }
+
+    @Override
     public void setRotation(final Rotation rotation) {
         this.rotation = rotation;
         this.dirty = true;
     }
 
     @Override
+    public Rotation getRotation() {
+        return rotation;
+    }
+
+    @Override
     public void setMirror(final Mirror mirror) {
         this.mirror = mirror;
         this.dirty = true;
+    }
+
+    @Override
+    public Mirror getMirror() {
+        return mirror;
     }
 
     @Override
@@ -107,23 +133,25 @@ public final class MultiblockVisualisationRendererImpl implements MultiblockVisu
         return airFilled;
     }
 
-    @Override
     public void renderMultiblock(PoseStack stack) {
-        if (!enabled || multiblock == null) return;
+        if (multiblock == null) {
+            setDisabled();
+        }
+        if (!enabled) return;
         Minecraft minecraft = Minecraft.getInstance();
         Level level = minecraft.level;
         if (level == null) return;
-        if (dirty) {
+        if (dirty || anchorPos == null) {
             if (rotation == null || multiblock.isSymmetrical()) {
                 rotation = Rotation.NONE;
             }
             if (mirror == null || multiblock.isSymmetrical()) {
                 mirror = Mirror.NONE;
             }
-            var pos = anchorPos;
-            if (pos == null) {
+            BlockPos newPos = anchorPos;
+            if (newPos == null) {
                 if (minecraft.hitResult instanceof BlockHitResult blockHitResult) {
-                    pos = blockHitResult.getBlockPos().relative(blockHitResult.getDirection());
+                    newPos = blockHitResult.getBlockPos().relative(blockHitResult.getDirection());
                 } else {
                     return;
                 }
@@ -135,8 +163,11 @@ public final class MultiblockVisualisationRendererImpl implements MultiblockVisu
                     case EAST -> Rotation.CLOCKWISE_90;
                 };
             }
-            simulateCache = multiblock.simulate(pos, rotation, mirror);
-            dirty = false;
+            if (dirty || !Objects.equals(currentPos, newPos)) {
+                currentPos = newPos;
+                simulateCache = multiblock.simulate(currentPos, rotation, mirror);
+                dirty = false;
+            }
         }
         EntityRenderDispatcher erd = minecraft.getEntityRenderDispatcher();
         double renderPosX = erd.camera.getPosition().x();
@@ -154,8 +185,8 @@ public final class MultiblockVisualisationRendererImpl implements MultiblockVisu
             if (!airMatcher) {
                 blocks++;
             }
-            if (!r.test(level, rotation, mirror)) {
-                BlockState renderState = r.stateMatcher().displayState(level.getGameTime());
+            if (!r.test(level)) {
+                BlockState renderState = r.displayState(level.getGameTime());
                 renderBlock(renderState, r.worldPos(), stack);
 
                 if (airMatcher) {

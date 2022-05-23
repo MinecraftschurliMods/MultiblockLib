@@ -3,6 +3,7 @@ pluginManagement {
         id 'net.minecraftforge.gradle' version '5.1.+' apply false
         id 'fabric-loom' version '0.11-SNAPSHOT' apply false
         id 'org.spongepowered.gradle.vanilla' version '0.2.1-SNAPSHOT' apply false
+        id 'org.spongepowered.mixin' version '0.7-SNAPSHOT' apply false
     }
     repositories {
         gradlePluginPortal()
@@ -26,6 +27,11 @@ pluginManagement {
                 case "net.minecraftforge.gradle": {
                     useVersion(version)
                     useModule("${requested.id}:ForgeGradle:${version}")
+                    break
+                }
+                case "org.spongepowered.mixin": {
+                    useVersion(version)
+                    useModule("org.spongepowered:mixingradle:${version}")
                     break
                 }
             }
