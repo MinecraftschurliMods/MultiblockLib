@@ -74,6 +74,9 @@ subprojects {
             processResources {
                 from xplat.sourceSets.main.resources
             }
+            processTestResources {
+                from xplat.sourceSets.test.resources
+            }
             tasks.withType(JavaCompile).configureEach {
                 source(xplat.sourceSets.main.allSource)
             }

@@ -39,6 +39,7 @@ public class ForgeXplatAbstractions implements XplatAbstractions {
         DATAPACK_SYNCERS.put(id, new DatapackSyncer<>(keyCodec, valueCodec, serverDataSupplier, clientDataConsumer));
     }
 
+    @Override
     public void init() {
         MinecraftForge.EVENT_BUS.addListener((AddReloadListenerEvent evt) -> serverReloadListeners.forEach(listener -> listener.accept(evt::addListener)));
         MinecraftForge.EVENT_BUS.addListener((OnDatapackSyncEvent evt) -> {
@@ -48,6 +49,10 @@ public class ForgeXplatAbstractions implements XplatAbstractions {
             }
         });
         channel.registerMessage(index++, DatapackSyncPacket.class, DatapackSyncPacket::encode, DatapackSyncPacket::new, DatapackSyncPacket::handle);
+    }
+
+    @Override
+    public void clientInit() {
     }
 
     private static class DatapackSyncer<K, V> {

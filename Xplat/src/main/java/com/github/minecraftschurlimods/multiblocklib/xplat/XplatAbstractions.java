@@ -17,4 +17,6 @@ public interface XplatAbstractions {
     <K, V> void registerDatapackSyncer(ResourceLocation id, Codec<K> keyCodec, Codec<V> valueCodec, Supplier<Map<K, V>> serverDataSupplier, Consumer<Map<K, V>> clientDataConsumer);
 
     void init();
+
+    void clientInit();
 }

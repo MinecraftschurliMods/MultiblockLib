@@ -16,7 +16,10 @@
   "environment": "*",
   "entrypoints": {
     "main": [
-      "com.github.miecraftschurlimods.multiblocklib.fabric.FabricModInitializer"
+      "com.github.minecraftschurlimods.multiblocklib.fabric.FabricModInitializer"
+    ],
+    "client": [
+      "com.github.minecraftschurlimods.multiblocklib.fabric.client.FabricClientModInitializer"
     ]
   },
   "mixins": [
