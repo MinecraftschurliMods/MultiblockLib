@@ -2,9 +2,12 @@ package com.github.minecraftschurlimods.multiblocklib.client;
 
 import com.github.minecraftschurlimods.multiblocklib.api.MBAPI;
 import com.github.minecraftschurlimods.multiblocklib.api.Multiblock;
+import com.github.minecraftschurlimods.multiblocklib.api.StateMatcher;
 import com.github.minecraftschurlimods.multiblocklib.api.client.MultiblockVisualisationRenderer;
-import com.github.minecraftschurlimods.multiblocklib.init.Init;
+import com.github.minecraftschurlimods.multiblocklib.api.matcher.AnyMatcher;
+import com.github.minecraftschurlimods.multiblocklib.api.matcher.DisplayOnlyMatcher;
 import com.github.minecraftschurlimods.multiblocklib.mixin.AccessorMultiBufferSource;
+import com.github.minecraftschurlimods.multiblocklib.xplat.ClientXplatAbstractions;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.BufferBuilder;
 import com.mojang.blaze3d.vertex.PoseStack;
@@ -14,21 +17,24 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.entity.EntityRenderDispatcher;
-import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.level.BlockAndTintGetter;
+import net.minecraft.world.level.ColorResolver;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.EntityBlock;
 import net.minecraft.world.level.block.Mirror;
 import net.minecraft.world.level.block.Rotation;
+import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.lighting.LevelLightEngine;
+import net.minecraft.world.level.material.FluidState;
 import net.minecraft.world.phys.BlockHitResult;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.Collection;
-import java.util.IdentityHashMap;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 
 public final class MultiblockVisualisationRendererImpl implements MultiblockVisualisationRenderer {
     private Multiblock multiblock;
@@ -46,7 +52,7 @@ public final class MultiblockVisualisationRendererImpl implements MultiblockVisu
 
     @Override
     public void setMultiblock(ResourceLocation id) {
-        setMultiblock(MBAPI.INSTANCE.getMultiblock(id));
+        setMultiblock(Minecraft.getInstance().level.registryAccess().registryOrThrow(MBAPI.MULTIBLOCK_REGISTRY).get(id));
     }
 
     @Override
@@ -179,15 +185,17 @@ public final class MultiblockVisualisationRendererImpl implements MultiblockVisu
             buffers = initBuffers(minecraft.renderBuffers().bufferSource());
         }
         blocks = blocksDone = airFilled = 0;
+        MBProxyLevel proxy = new MBProxyLevel(level, simulateCache);
         for (final Multiblock.SimulateResult r : simulateCache) {
-            if (r.stateMatcher().getType().equals(Init.ANY_MATCHER.getId())) continue;
-            boolean airMatcher = r.stateMatcher().getType().equals(Init.AIR_MATCHER.getId());
+            StateMatcher stateMatcher = r.stateMatcher();
+            if (stateMatcher instanceof DisplayOnlyMatcher || stateMatcher instanceof AnyMatcher) continue;
+            boolean airMatcher = stateMatcher.isAir();
             if (!airMatcher) {
                 blocks++;
             }
             if (!r.test(level)) {
                 BlockState renderState = r.displayState(level.getGameTime());
-                renderBlock(renderState, r.worldPos(), stack);
+                renderBlock(renderState, r.worldPos(), stack, proxy);
 
                 if (airMatcher) {
                     airFilled++;
@@ -199,11 +207,11 @@ public final class MultiblockVisualisationRendererImpl implements MultiblockVisu
         stack.popPose();
     }
 
-    private void renderBlock(BlockState state, BlockPos pos, PoseStack stack) {
+    private void renderBlock(BlockState state, BlockPos pos, PoseStack stack, BlockAndTintGetter level) {
         stack.pushPose();
         stack.translate(pos.getX(), pos.getY(), pos.getZ());
 
-        if (state.getBlock() == Blocks.AIR) {
+        if (state.isAir()) {
             float scale = 0.3F;
             float off = (1F - scale) / 2;
             stack.translate(off, off, -off);
@@ -212,7 +220,7 @@ public final class MultiblockVisualisationRendererImpl implements MultiblockVisu
             state = Blocks.RED_CONCRETE.defaultBlockState();
         }
 
-        Minecraft.getInstance().getBlockRenderer().renderSingleBlock(state, stack, buffers, 0xF000F0, OverlayTexture.NO_OVERLAY);
+        ClientXplatAbstractions.INSTANCE.renderInWorld(state, pos, level, stack, buffers);
 
         stack.popPose();
     }
@@ -225,6 +233,66 @@ public final class MultiblockVisualisationRendererImpl implements MultiblockVisu
             remapped.put(GhostRenderLayer.remap(e.getKey()), e.getValue());
         }
         return new GhostBuffers(fallback, remapped);
+    }
+
+    private static class MBProxyLevel implements BlockAndTintGetter {
+        private final transient Map<BlockPos, BlockEntity> teCache = new HashMap<>();
+        private final Level parent;
+        private final Collection<Multiblock.SimulateResult> simulateCache;
+
+        public MBProxyLevel(Level parent, Collection<Multiblock.SimulateResult> simulateCache) {
+            this.parent = parent;
+            this.simulateCache = simulateCache;
+        }
+
+        @Override
+        public float getShade(Direction dir, boolean var2) {
+            return 1.0F;
+        }
+
+        @Override
+        public LevelLightEngine getLightEngine() {
+            return parent.getLightEngine();
+        }
+
+        @Override
+        public int getBlockTint(BlockPos blockPos, ColorResolver colorResolver) {
+            return parent.getBlockTint(blockPos, colorResolver);
+        }
+
+        @Nullable
+        @Override
+        public BlockEntity getBlockEntity(BlockPos pos) {
+            BlockState state = getBlockState(pos);
+            if (state.getBlock() instanceof EntityBlock) {
+                return teCache.computeIfAbsent(pos.immutable(), p -> ((EntityBlock) state.getBlock()).newBlockEntity(pos, state));
+            }
+            return null;
+        }
+
+        @Override
+        public BlockState getBlockState(BlockPos blockPos) {
+            return simulateCache.stream()
+                    .filter(r -> r.worldPos().equals(blockPos))
+                    .findFirst()
+                    .map(simulateResult -> simulateResult.displayState(parent.getGameTime()))
+                    .orElse(Blocks.AIR.defaultBlockState());
+        }
+
+        @Override
+        public FluidState getFluidState(BlockPos blockPos) {
+            return getBlockState(blockPos).getFluidState();
+        }
+
+        @Override
+        public int getHeight() {
+            return parent.getHeight();
+        }
+
+        @Override
+        public int getMinBuildHeight() {
+            return parent.getMinBuildHeight();
+        }
     }
 
     private static class GhostBuffers extends MultiBufferSource.BufferSource {

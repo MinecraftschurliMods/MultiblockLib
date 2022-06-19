@@ -1,81 +1,47 @@
 package com.github.minecraftschurlimods.multiblocklib.fabric.xplat;
 
 import com.github.minecraftschurlimods.multiblocklib.api.MBAPI;
+import com.github.minecraftschurlimods.multiblocklib.api.Multiblock;
+import com.github.minecraftschurlimods.multiblocklib.api.StateMatcher;
+import com.github.minecraftschurlimods.multiblocklib.init.Init;
 import com.github.minecraftschurlimods.multiblocklib.xplat.XplatAbstractions;
 import com.mojang.serialization.Codec;
-import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
-import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
-import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
-import net.fabricmc.fabric.api.resource.IdentifiableResourceReloadListener;
-import net.fabricmc.fabric.api.resource.ResourceManagerHelper;
-import net.minecraft.network.FriendlyByteBuf;
+import com.mojang.serialization.Lifecycle;
+import net.fabricmc.fabric.api.event.registry.FabricRegistryBuilder;
+import net.minecraft.core.MappedRegistry;
+import net.minecraft.core.Registry;
+import net.minecraft.core.WritableRegistry;
+import net.minecraft.data.BuiltinRegistries;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.server.packs.PackType;
-import net.minecraft.server.packs.resources.PreparableReloadListener;
-import net.minecraft.server.packs.resources.ResourceManager;
-import net.minecraft.util.profiling.ProfilerFiller;
-import org.apache.commons.lang3.tuple.Triple;
-
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executor;
-import java.util.function.Consumer;
-import java.util.function.Function;
-import java.util.function.Supplier;
+import net.minecraft.util.ExtraCodecs;
 
 public class FabricXplatAbstractions implements XplatAbstractions {
-    private static final ResourceLocation ID = new ResourceLocation(MBAPI.MODID, "datapacks");
-    private static final Map<ResourceLocation, Triple<Consumer<FriendlyByteBuf>, Function<FriendlyByteBuf, Map<?, ?>>, Consumer<Map<?, ?>>>> SYNCER = new HashMap<>();
-    private final Set<PreparableReloadListener> listeners = new HashSet<>();
-
-    @Override
-    public void registerServerReloadListener(final Consumer<Consumer<PreparableReloadListener>> consumer) {
-        consumer.accept(listeners::add);
-    }
-
-    @SuppressWarnings("unchecked")
-    @Override
-    public <K, V> void registerDatapackSyncer(final ResourceLocation id, final Codec<K> keyCodec, final Codec<V> valueCodec, final Supplier<Map<K, V>> serverDataSupplier, final Consumer<Map<K, V>> clientDataConsumer) {
-        var codec = Codec.unboundedMap(keyCodec, valueCodec);
-        SYNCER.put(id, Triple.of(buf -> buf.writeWithCodec(codec, serverDataSupplier.get()), buf -> buf.readWithCodec(codec), map -> clientDataConsumer.accept((Map<K, V>)map)));
-    }
+    private Registry<Codec<? extends Multiblock>> multiblockTypeRegistry;
+    private Registry<Codec<? extends StateMatcher>> stateMatcherTypeRegistry;
 
     @Override
     public void init() {
-        ResourceManagerHelper.get(PackType.SERVER_DATA).registerReloadListener(new IdentifiableResourceReloadListener() {
-            @Override
-            public ResourceLocation getFabricId() {
-                return ID;
-            }
+        multiblockTypeRegistry = FabricRegistryBuilder.createDefaulted((Class<Codec<? extends Multiblock>>)((Object)Codec.class), MBAPI.MULTIBLOCK_TYPE_REGISTRY.location(), new ResourceLocation(MBAPI.MODID, "dense")).buildAndRegister();
+        stateMatcherTypeRegistry = FabricRegistryBuilder.createDefaulted((Class<Codec<? extends StateMatcher>>)((Object)Codec.class), MBAPI.STATE_MATCHER_TYPE_REGISTRY.location(), new ResourceLocation(MBAPI.MODID, "strict_state")).buildAndRegister();
+        createRegistry(MBAPI.MULTIBLOCK_REGISTRY, Lifecycle.experimental());
+        ((FabricRegistryProviderFactory.Provider<Codec<? extends Multiblock>>) Init.MULTIBLOCK_TYPES).register();
+        ((FabricRegistryProviderFactory.Provider<Codec<? extends StateMatcher>>) Init.STATE_MATCHER_TYPES).register();
+    }
 
-            @Override
-            public CompletableFuture<Void> reload(final PreparationBarrier preparationBarrier, final ResourceManager resourceManager, final ProfilerFiller profilerFiller, final ProfilerFiller profilerFiller2, final Executor executor, final Executor executor2) {
-                return CompletableFuture.allOf(listeners.stream().map(preparableReloadListener -> preparableReloadListener.reload(preparationBarrier, resourceManager, profilerFiller, profilerFiller2, executor, executor2)).toArray(CompletableFuture[]::new));
-            }
-        });
+    private <T> Registry<T> createRegistry(ResourceKey<Registry<T>> registryKey, Lifecycle lifecycle) {
+        MappedRegistry<T> registry = new MappedRegistry<>(registryKey, lifecycle, null);
+        ((WritableRegistry) BuiltinRegistries.REGISTRY).register(registryKey, registry, lifecycle);
+        return registry;
     }
 
     @Override
-    public void clientInit() {
-        ClientPlayNetworking.registerReceiver(ID, (c, h, buf, responseSender) -> {
-            ResourceLocation id = buf.readResourceLocation();
-            var syncer = SYNCER.get(id);
-            if (syncer == null) return;
-            Map<?,?> data = syncer.getMiddle().apply(buf);
-            syncer.getRight().accept(data);
-        });
+    public Codec<Codec<? extends Multiblock>> getMultiblockTypeRegistryCodec() {
+        return ExtraCodecs.lazyInitializedCodec(() -> multiblockTypeRegistry.byNameCodec());
     }
 
-    public static void reloadResources(final ServerPlayer player) {
-        SYNCER.forEach((id, syncer) -> {
-            FriendlyByteBuf buf = PacketByteBufs.create();
-            buf.writeResourceLocation(id);
-            syncer.getLeft().accept(buf);
-            ServerPlayNetworking.send(player, ID, buf);
-        });
+    @Override
+    public Codec<Codec<? extends StateMatcher>> getStateMatcherTypeRegistryCodec() {
+        return ExtraCodecs.lazyInitializedCodec(() -> stateMatcherTypeRegistry.byNameCodec());
     }
 }

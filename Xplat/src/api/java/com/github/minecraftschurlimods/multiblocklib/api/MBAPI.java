@@ -30,6 +30,11 @@ public interface MBAPI {
     ResourceKey<Registry<Codec<? extends StateMatcher>>> STATE_MATCHER_TYPE_REGISTRY = ResourceKey.createRegistryKey(new ResourceLocation(MODID, "state_matcher_type"));
 
     /**
+     * The key for the multiblock registry.
+     */
+    ResourceKey<Registry<Multiblock>> MULTIBLOCK_REGISTRY = ResourceKey.createRegistryKey(new ResourceLocation(MODID, "multiblock"));
+
+    /**
      * Get the multiblock for the given id.
      *
      * @param id the id of the multiblock to get
@@ -48,18 +53,14 @@ public interface MBAPI {
     ResourceLocation getMultiblockId(Multiblock multiblock);
 
     /**
-     * Get the state matcher codec for the given id from the {@link #STATE_MATCHER_TYPE_REGISTRY}.
-     *
-     * @param id the id of the state matcher codec
-     * @return the state matcher codec for the given id from the {@link #STATE_MATCHER_TYPE_REGISTRY}.
+     * Get the codec for entries of the {@link #MULTIBLOCK_TYPE_REGISTRY}.
+     * @return the codec for entries of the {@link #MULTIBLOCK_TYPE_REGISTRY}.
      */
-    Codec<? extends StateMatcher> getStateMatcherCodec(ResourceLocation id);
+    Codec<Codec<? extends Multiblock>> getMultiblockTypeRegistryCodec();
 
     /**
-     * Get the multiblock codec for the given id from the {@link #MULTIBLOCK_TYPE_REGISTRY}.
-     *
-     * @param id the id of the multiblock codec
-     * @return the multiblock codec for the given id from the {@link #MULTIBLOCK_TYPE_REGISTRY}.
+     * Get the codec for entries of the {@link #STATE_MATCHER_TYPE_REGISTRY}.
+     * @return the codec for entries of the {@link #STATE_MATCHER_TYPE_REGISTRY}.
      */
-    Codec<? extends Multiblock> getMultiblockCodec(ResourceLocation id);
+    Codec<Codec<? extends StateMatcher>> getStateMatcherTypeRegistryCodec();
 }

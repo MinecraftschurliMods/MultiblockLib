@@ -1,6 +1,6 @@
 @MethodsReturnNonnullByDefault
 @ParametersAreNonnullByDefault
-package com.github.minecraftschurlimods.multiblocklib.impl.matcher;
+package com.github.minecraftschurlimods.multiblocklib.api.matcher;
 
 import net.minecraft.MethodsReturnNonnullByDefault;
 

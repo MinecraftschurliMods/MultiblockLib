@@ -2,9 +2,10 @@ package com.github.minecraftschurlimods.multiblocklib.api;
 
 import com.mojang.datafixers.util.Pair;
 import com.mojang.serialization.Codec;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Vec3i;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.core.*;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.RegistryFileCodec;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Mirror;
@@ -13,6 +14,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Collection;
+import java.util.function.Function;
 import java.util.function.Predicate;
 
 /**
@@ -20,15 +22,25 @@ import java.util.function.Predicate;
  */
 public interface Multiblock {
     /**
-     * The codec of a multiblock. It uses the type field to determine the actual codec to use.
+     * The direct codec of a multiblock. It uses the type field to determine the actual codec to use for deserialization.
      * Register a multiblock type in the registry {@link MBAPI#MULTIBLOCK_TYPE_REGISTRY} to add your own type.
      */
-    Codec<Multiblock> CODEC = ResourceLocation.CODEC.dispatch(Multiblock::getType, MBAPI.INSTANCE::getMultiblockCodec);
+    Codec<Multiblock> DIRECT_CODEC = MBAPI.INSTANCE.getMultiblockTypeRegistryCodec().dispatch(Multiblock::codec, Function.identity());
 
     /**
-     * @return The type of this multiblock.
+     * The codec of a multiblock reference, tries to get the entry from the registry.
      */
-    ResourceLocation getType();
+    Codec<Holder<Multiblock>> REFERENCE_CODEC = RegistryFileCodec.create(MBAPI.MULTIBLOCK_REGISTRY, DIRECT_CODEC);
+
+    /**
+     * Codec for a list of multiblocks, can be a tag, a list or a single element.
+     */
+    Codec<HolderSet<Multiblock>> LIST_CODEC = RegistryCodecs.homogeneousList(MBAPI.MULTIBLOCK_REGISTRY, DIRECT_CODEC);
+
+    /**
+     * @return The codec of this multiblock.
+     */
+    Codec<? extends Multiblock> codec();
 
     /**
      * @return Whether this multiblock is symmetrical.
@@ -48,7 +60,7 @@ public interface Multiblock {
      * @param rotation  the rotation of the multiblock
      * @param mirror    the mirror mode of the multiblock
      */
-    void place(Level level, BlockPos anchorPos, Rotation rotation, Mirror mirror);
+    void place(ServerLevel level, BlockPos anchorPos, Rotation rotation, Mirror mirror);
 
     /**
      * Check if this multiblock is present in the given level at the given anchor position with the given rotation and mirror mode.
@@ -78,7 +90,26 @@ public interface Multiblock {
      * @param mirror    the mirror mode to simulate this multiblock with
      * @return the simulation of this multiblock
      */
-    Collection<SimulateResult> simulate(BlockPos anchorPos, Rotation rotation, Mirror mirror);
+    default Collection<SimulateResult> simulate(BlockPos anchorPos, Rotation rotation, Mirror mirror) {
+        return simulate(anchorPos, rotation, mirror, SimulateFilter.ALL);
+    }
+
+    /**
+     * Simulate this multiblock at the given anchor position and with the given rotation and mirror mode.
+     * Includes only the multiblock relative positions that match the given filter.
+     *
+     * @param anchorPos the position to simulate this multiblock at
+     * @param rotation  the rotation to simulate this multiblock with
+     * @param mirror    the mirror mode to simulate this multiblock with
+     * @param filter     the filter to use
+     * @return the simulation of this multiblock
+     */
+    Collection<SimulateResult> simulate(BlockPos anchorPos, Rotation rotation, Mirror mirror, SimulateFilter filter);
+
+    /**
+     * @return The name of this multiblock.
+     */
+    Component getName();
 
     /**
      * Interface representing a simulation result. A simulation result is a holder for a state matcher and its position in the world.
@@ -119,5 +150,19 @@ public interface Multiblock {
          * @return true if it matches, false otherwise
          */
         boolean test(BlockGetter level);
+    }
+
+    interface SimulateFilter extends Predicate<Vec3i> {
+        SimulateFilter ALL = (pos) -> true;
+
+        static SimulateFilter at(Vec3i pos) {
+            return (p) -> p.equals(pos);
+        }
+
+        static SimulateFilter plane(int index, Direction.Axis axis) {
+            return (p) -> p.get(axis) == index;
+        }
+
+        boolean test(Vec3i pos);
     }
 }

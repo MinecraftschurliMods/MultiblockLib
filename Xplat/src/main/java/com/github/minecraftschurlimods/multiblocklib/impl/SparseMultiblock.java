@@ -1,15 +1,13 @@
 package com.github.minecraftschurlimods.multiblocklib.impl;
 
-import com.github.minecraftschurlimods.multiblocklib.Util;
+import com.github.minecraftschurlimods.multiblocklib.api.Util;
 import com.github.minecraftschurlimods.multiblocklib.api.Multiblock;
 import com.github.minecraftschurlimods.multiblocklib.api.StateMatcher;
-import com.github.minecraftschurlimods.multiblocklib.init.Init;
 import com.google.common.collect.ImmutableMap;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Vec3i;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.block.Mirror;
 import net.minecraft.world.level.block.Rotation;
 
@@ -70,12 +68,12 @@ public class SparseMultiblock extends AbstractMultiblock {
     }
 
     @Override
-    public ResourceLocation getType() {
-        return Init.SPARSE.getId();
+    public Codec<? extends Multiblock> codec() {
+        return CODEC;
     }
 
     @Override
-    public Collection<SimulateResult> simulate(final BlockPos anchorPos, final Rotation rotation, final Mirror mirror) {
+    public Collection<SimulateResult> simulate(final BlockPos anchorPos, final Rotation rotation, final Mirror mirror, final SimulateFilter filter) {
         return data.entrySet()
                 .stream()
                 .<SimulateResult>map(entry -> new SimulateResultImpl(entry.getValue(), anchorPos.offset(entry.getKey().rotate(rotation)), rotation, mirror))

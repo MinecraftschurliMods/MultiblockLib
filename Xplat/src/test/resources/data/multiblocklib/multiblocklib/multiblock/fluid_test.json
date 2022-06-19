@@ -1,0 +1,37 @@
+{
+  "pattern": [
+    ["GG   GG"],
+    [" LLLLLG"],
+    ["GGGGGGG"],
+    [" WW0WWG"],
+    ["GGGGGGG"],
+    [" SSSSSG"],
+    ["GG   GG"]
+  ],
+  "mapping": {
+    " ": {
+      "type": "multiblocklib:any"
+    },
+    "0": {
+      "tag": "#forge:storage_blocks/lapis",
+      "type": "multiblocklib:tag"
+    },
+    "G": {
+      "block": "minecraft:bricks",
+      "type": "multiblocklib:loose_block"
+    },
+    "W": {
+      "block": "minecraft:water",
+      "type": "multiblocklib:loose_block"
+    },
+    "L": {
+      "block": "minecraft:lava",
+      "type": "multiblocklib:loose_block"
+    },
+    "S": {
+      "state": "minecraft:brick_slab[type=bottom,waterlogged=true]",
+      "type": "multiblocklib:strict_state"
+    }
+  },
+  "type": "multiblocklib:dense"
+}

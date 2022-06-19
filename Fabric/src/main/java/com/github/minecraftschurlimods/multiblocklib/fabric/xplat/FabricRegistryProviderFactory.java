@@ -2,9 +2,10 @@ package com.github.minecraftschurlimods.multiblocklib.fabric.xplat;
 
 import com.github.minecraftschurlimods.multiblocklib.init.RegistrationProvider;
 import com.github.minecraftschurlimods.multiblocklib.init.RegistryObject;
+import com.google.common.base.Suppliers;
 import net.minecraft.core.Holder;
 import net.minecraft.core.Registry;
-import net.minecraft.core.RegistryAccess;
+import net.minecraft.data.BuiltinRegistries;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 
@@ -20,24 +21,23 @@ public final class FabricRegistryProviderFactory implements RegistrationProvider
         return new Provider<>(modId, registryKey);
     }
 
-    private static class Provider<T> implements RegistrationProvider<T> {
+    static class Provider<T> implements RegistrationProvider<T> {
         private final String modId;
-        private final Registry<T> registry;
 
         private final Set<RegistryObject<T>> entries = new HashSet<>();
         private final Set<RegistryObject<T>> entriesView = Collections.unmodifiableSet(entries);
+        private final ResourceKey<? extends Registry<T>> registryKey;
 
         private Provider(String modId, ResourceKey<? extends Registry<T>> key) {
             this.modId = modId;
-            this.registry = RegistryAccess.BUILTIN.get().registryOrThrow(key);
+            this.registryKey = key;
         }
 
         @SuppressWarnings("unchecked")
         @Override
         public <I extends T> RegistryObject<I> register(String name, Supplier<? extends I> supplier) {
             final var rl = new ResourceLocation(modId, name);
-            final var obj = Registry.register(registry, rl, supplier.get());
-            final var ro = new FabricRegistryObject<>(registry, rl, obj);
+            final var ro = new FabricRegistryObject<T, I>(registryKey, rl, supplier);
             entries.add((RegistryObject<T>) ro);
             return ro;
         }
@@ -51,25 +51,34 @@ public final class FabricRegistryProviderFactory implements RegistrationProvider
         public String getModId() {
             return modId;
         }
+
+        void register() {
+            entries.forEach(ro -> ((FabricRegistryObject<T, ?>) ro).register());
+        }
     }
 
     private static class FabricRegistryObject<T, I extends T> implements RegistryObject<I> {
-        final ResourceKey<I> key;
+        private final ResourceKey<T> key;
+        private final Supplier<Registry<T>> registry;
+        private final Supplier<? extends I> sup;
         private final ResourceLocation rl;
-        private final I obj;
-        private final Registry<I> registry;
+        private I obj;
 
-        @SuppressWarnings("unchecked")
-        public FabricRegistryObject(final Registry<T> registry, final ResourceLocation rl, final I obj) {
+        public FabricRegistryObject(ResourceKey<? extends Registry<T>> registryKey, ResourceLocation rl, Supplier<? extends I> sup) {
             this.rl = rl;
-            this.obj = obj;
-            this.key = (ResourceKey<I>) ResourceKey.create(registry.key(), rl);
-            this.registry = (Registry<I>) registry;
+            this.sup = sup;
+            this.key = ResourceKey.create(registryKey, rl);
+            this.registry = Suppliers.memoize(() -> {
+                Registry<T> registry = (Registry<T>) Registry.REGISTRY.get(registryKey.location());
+                if (registry == null)
+                    registry = (Registry<T>) BuiltinRegistries.REGISTRY.get(registryKey.location());
+                return registry;
+            });
         }
 
         @Override
         public ResourceKey<I> getResourceKey() {
-            return key;
+            return (ResourceKey<I>) key;
         }
 
         @Override
@@ -84,12 +93,17 @@ public final class FabricRegistryProviderFactory implements RegistrationProvider
 
         @Override
         public Holder<I> asHolder() {
-            return registry.getOrCreateHolder(this.key);
+            return (Holder<I>) registry.get().getOrCreateHolder(key).result().get();
         }
 
         @Override
         public boolean isPresent() {
             return true;
+        }
+
+        private void register() {
+            if (obj != null) return;
+            obj = Registry.register(registry.get(), rl, sup.get());
         }
     }
 }

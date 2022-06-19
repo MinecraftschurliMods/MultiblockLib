@@ -51,4 +51,11 @@ public interface MultiblockWidget extends Widget, GuiEventListener, NarratableEn
      * @param height the new height of this multiblock widget
      */
     void setHeight(int height);
+
+    /**
+     * Set the filter of this multiblock widget.
+     *
+     * @param filter the new filter of this multiblock widget
+     */
+    void setFilter(Multiblock.SimulateFilter filter);
 }

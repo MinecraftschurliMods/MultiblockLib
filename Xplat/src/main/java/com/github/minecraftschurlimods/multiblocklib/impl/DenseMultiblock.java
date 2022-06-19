@@ -1,15 +1,13 @@
 package com.github.minecraftschurlimods.multiblocklib.impl;
 
-import com.github.minecraftschurlimods.multiblocklib.Util;
+import com.github.minecraftschurlimods.multiblocklib.api.Util;
 import com.github.minecraftschurlimods.multiblocklib.api.Multiblock;
 import com.github.minecraftschurlimods.multiblocklib.api.StateMatcher;
-import com.github.minecraftschurlimods.multiblocklib.init.Init;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.DataResult;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Vec3i;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.block.Mirror;
 import net.minecraft.world.level.block.Rotation;
 
@@ -83,17 +81,19 @@ public class DenseMultiblock extends AbstractMultiblock {
     }
 
     @Override
-    public ResourceLocation getType() {
-        return Init.DENSE.getId();
+    public Codec<? extends Multiblock> codec() {
+        return CODEC;
     }
 
     @Override
-    public Collection<SimulateResult> simulate(BlockPos anchorPos, Rotation rotation, Mirror mirror) {
+    public Collection<SimulateResult> simulate(BlockPos anchorPos, Rotation rotation, Mirror mirror, SimulateFilter filter) {
         List<SimulateResult> results = new ArrayList<>();
         for (int x = 0; x < this.structure.length; x++) {
             for (int y = 0; y < this.structure[0].length; y++) {
                 for (int z = 0; z < this.structure[0][0].length; z++) {
-                    BlockPos pos = anchorPos.offset(new BlockPos(x, y, z).subtract(this.origin).rotate(rotation));
+                    BlockPos blockPos = new BlockPos(x, y, z);
+                    if (!filter.test(blockPos)) continue;
+                    BlockPos pos = anchorPos.offset(blockPos.subtract(this.origin).rotate(rotation));
                     results.add(new SimulateResultImpl(this.mapping.get(this.structure[x][y][z]), pos, rotation, mirror));
                 }
             }
@@ -102,7 +102,7 @@ public class DenseMultiblock extends AbstractMultiblock {
     }
 
     @Override
-    public boolean equals(final AbstractMultiblock o) {
+    public boolean equals(AbstractMultiblock o) {
         final DenseMultiblock that = (DenseMultiblock) o;
 
         if (!Arrays.deepEquals(structure, that.structure)) {

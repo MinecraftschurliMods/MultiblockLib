@@ -1,28 +1,31 @@
-package com.github.minecraftschurlimods.multiblocklib.impl.matcher;
+package com.github.minecraftschurlimods.multiblocklib.api.matcher;
 
 import com.github.minecraftschurlimods.multiblocklib.api.BlockStateMatchContext;
 import com.github.minecraftschurlimods.multiblocklib.api.StateMatcher;
-import com.github.minecraftschurlimods.multiblocklib.init.Init;
 import com.mojang.serialization.Codec;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 
-public class AirMatcher implements StateMatcher {
+public record AirMatcher() implements StateMatcher {
     public static final Codec<AirMatcher> CODEC = Codec.unit(AirMatcher::new);
 
     @Override
-    public ResourceLocation getType() {
-        return Init.AIR_MATCHER.getId();
+    public Codec<? extends StateMatcher> codec() {
+        return CODEC;
     }
 
     @Override
-    public BlockState displayState(final long gameTime) {
+    public BlockState displayState(long gameTime) {
         return Blocks.AIR.defaultBlockState();
     }
 
     @Override
-    public boolean test(final BlockStateMatchContext context) {
+    public boolean test(BlockStateMatchContext context) {
         return context.state().isAir();
+    }
+
+    @Override
+    public boolean isAir() {
+        return true;
     }
 }

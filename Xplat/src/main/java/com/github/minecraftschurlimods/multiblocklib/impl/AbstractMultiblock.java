@@ -1,20 +1,24 @@
 package com.github.minecraftschurlimods.multiblocklib.impl;
 
 import com.github.minecraftschurlimods.multiblocklib.api.BlockStateMatchContext;
+import com.github.minecraftschurlimods.multiblocklib.api.MBAPI;
 import com.github.minecraftschurlimods.multiblocklib.api.Multiblock;
 import com.github.minecraftschurlimods.multiblocklib.api.StateMatcher;
-import com.github.minecraftschurlimods.multiblocklib.impl.matcher.AirMatcher;
-import com.github.minecraftschurlimods.multiblocklib.impl.matcher.AnyMatcher;
+import com.github.minecraftschurlimods.multiblocklib.api.matcher.AirMatcher;
+import com.github.minecraftschurlimods.multiblocklib.api.matcher.AnyMatcher;
 import com.google.common.collect.ImmutableMap;
 import com.mojang.datafixers.util.Pair;
 import net.minecraft.Util;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Vec3i;
+import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.BlockGetter;
-import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Mirror;
 import net.minecraft.world.level.block.Rotation;
+import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.material.FluidState;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.HashMap;
@@ -40,8 +44,8 @@ public abstract class AbstractMultiblock implements Multiblock {
     }
 
     @Override
-    public void place(final Level level, final BlockPos anchorPos, final Rotation rotation, final Mirror mirror) {
-        simulate(anchorPos, rotation, mirror).forEach(r -> {
+    public void place(ServerLevel level, BlockPos anchorPos, Rotation rotation, Mirror mirror) {
+        simulate(anchorPos, rotation, mirror, SimulateFilter.ALL).forEach(r -> {
             BlockPos placePos = r.worldPos();
             BlockState targetState = r.displayState(level.getGameTime());
             if (!targetState.isAir() && targetState.canSurvive(level, placePos) && level.getBlockState(placePos).getMaterial().isReplaceable()) {
@@ -51,13 +55,13 @@ public abstract class AbstractMultiblock implements Multiblock {
     }
 
     @Override
-    public boolean matches(final BlockGetter level, final BlockPos anchorPos, final Rotation rotation, final Mirror mirror) {
-        return simulate(anchorPos, rotation, mirror).stream().allMatch(simulateResult -> simulateResult.stateMatcher().test(new DenseMultiblock.SimpleBlockStateMatchContext(simulateResult.worldPos(), level, rotation, mirror)));
+    public boolean matches(BlockGetter level, BlockPos anchorPos, Rotation rotation, Mirror mirror) {
+        return simulate(anchorPos, rotation, mirror, SimulateFilter.ALL).stream().allMatch(simulateResult -> simulateResult.stateMatcher().test(new DenseMultiblock.SimpleBlockStateMatchContext(simulateResult.worldPos(), level, rotation, mirror)));
     }
 
     @Nullable
     @Override
-    public Pair<Rotation, Mirror> matches(final BlockGetter level, final BlockPos anchorPos) {
+    public Pair<Rotation, Mirror> matches(BlockGetter level, BlockPos anchorPos) {
         if (isSymmetrical() && matches(level, anchorPos, Rotation.NONE, Mirror.NONE)) {
             return Pair.of(Rotation.NONE, Mirror.NONE);
         } else {
@@ -78,7 +82,7 @@ public abstract class AbstractMultiblock implements Multiblock {
         map.put('0', new AirMatcher());
     });
 
-    protected static Map<Character, StateMatcher> addDefaultMappings(final Map<Character, StateMatcher> mapping) {
+    protected static Map<Character, StateMatcher> addDefaultMappings(Map<Character, StateMatcher> mapping) {
         var builder = ImmutableMap.<Character, StateMatcher>builder();
         builder.putAll(mapping);
         for (final Map.Entry<Character, StateMatcher> entry : DEFAULT_MATCHERS.entrySet()) {
@@ -89,9 +93,9 @@ public abstract class AbstractMultiblock implements Multiblock {
         return builder.build();
     }
 
-    protected static Map<Character, StateMatcher> removeDefaultMappings(final Map<Character, StateMatcher> mapping) {
+    protected static Map<Character, StateMatcher> removeDefaultMappings(Map<Character, StateMatcher> mapping) {
         Map<Character, StateMatcher> out = new HashMap<>(mapping);
-        for (final Map.Entry<Character, StateMatcher> entry : DEFAULT_MATCHERS.entrySet()) {
+        for (Map.Entry<Character, StateMatcher> entry : DEFAULT_MATCHERS.entrySet()) {
             if (mapping.containsKey(entry.getKey()) && mapping.get(entry.getKey()) == entry.getValue()) {
                 out.remove(entry.getKey());
             }
@@ -100,7 +104,7 @@ public abstract class AbstractMultiblock implements Multiblock {
     }
 
     @Override
-    public boolean equals(final Object o) {
+    public boolean equals(Object o) {
         if (this == o) {
             return true;
         }
@@ -108,7 +112,7 @@ public abstract class AbstractMultiblock implements Multiblock {
             return false;
         }
 
-        final AbstractMultiblock that = (AbstractMultiblock) o;
+        AbstractMultiblock that = (AbstractMultiblock) o;
 
         if (isSymmetrical() != that.isSymmetrical()) {
             return false;
@@ -119,9 +123,15 @@ public abstract class AbstractMultiblock implements Multiblock {
         return this.equals(that);
     }
 
-    public abstract boolean equals(final AbstractMultiblock other);
+    public abstract boolean equals(AbstractMultiblock other);
 
+    @Override
     public abstract int hashCode();
+
+    @Override
+    public Component getName() {
+        return Component.translatable(Util.makeDescriptionId("multiblock", MBAPI.INSTANCE.getMultiblockId(this)));
+    }
 
     protected record SimulateResultImpl(StateMatcher stateMatcher, BlockPos worldPos, Rotation rotation, Mirror mirror) implements SimulateResult {
         @Override
@@ -136,26 +146,30 @@ public abstract class AbstractMultiblock implements Multiblock {
     }
 
     static class SimpleBlockStateMatchContext implements BlockStateMatchContext {
+        private final Map<String, Object> data = new HashMap<>();
         private final BlockPos pos;
         private final BlockGetter level;
-        private final BlockState state;
-        private final Map<String, Object> data = new HashMap<>();
+        private final Rotation rotation;
+        private final Mirror mirror;
+        private @Nullable BlockState state;
+        private @Nullable FluidState fluidState;
+        private @Nullable BlockEntity blockEntity;
 
-        public SimpleBlockStateMatchContext(final BlockPos pos, final BlockGetter level, Rotation rotation, Mirror mirror) {
+        public SimpleBlockStateMatchContext(BlockPos pos, BlockGetter level, Rotation rotation, Mirror mirror) {
             this.pos = pos;
             this.level = level;
-            /*mirror = switch (mirror) {
-                case LEFT_RIGHT -> Mirror.NONE;
-                case FRONT_BACK -> Mirror.FRONT_BACK;
-                case NONE -> Mirror.LEFT_RIGHT;
-            };*/
-            rotation = switch (rotation) {
+            this.rotation = switch (rotation) {
                 case NONE -> Rotation.NONE;
                 case CLOCKWISE_90 -> Rotation.COUNTERCLOCKWISE_90;
                 case CLOCKWISE_180 -> Rotation.CLOCKWISE_180;
                 case COUNTERCLOCKWISE_90 -> Rotation.CLOCKWISE_90;
             };
-            this.state = level.getBlockState(pos).mirror(mirror).rotate(rotation);
+            this.mirror = mirror;
+            /*mirror = switch (mirror) {
+                case LEFT_RIGHT -> Mirror.NONE;
+                case FRONT_BACK -> Mirror.FRONT_BACK;
+                case NONE -> Mirror.LEFT_RIGHT;
+            };*/
         }
 
         @Override
@@ -165,7 +179,27 @@ public abstract class AbstractMultiblock implements Multiblock {
 
         @Override
         public BlockState state() {
+            if (state == null) {
+                this.state = level.getBlockState(pos).mirror(mirror).rotate(rotation);
+            }
             return state;
+        }
+
+        @Override
+        public FluidState fluidState() {
+            if (fluidState == null) {
+                this.fluidState = level.getFluidState(pos);
+            }
+            return fluidState;
+        }
+
+        @Override
+        @Nullable
+        public BlockEntity blockEntity() {
+            if (blockEntity == null) {
+                this.blockEntity = level.getBlockEntity(pos);
+            }
+            return blockEntity;
         }
 
         @Override
